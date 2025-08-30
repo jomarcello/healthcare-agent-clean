@@ -50,187 +50,10 @@ class CompleteHealthcareAutomationAgent {
         this.deploymentResults = [];
         this.currentStep = 'idle';
         this.browser = null;
-        this.elevenlabsAgent = null;
-        this.initializeElevenLabsAgent();
+        // ElevenLabs functionality removed for simplified 3-step workflow
     }
 
-    async initializeElevenLabsAgent() {
-        if (!config.elevenlabs_api_key) {
-            console.warn('⚠️ ElevenLabs API key not configured');
-            return;
-        }
-
-        try {
-            // ALWAYS use template mode to prevent credit drainage
-            console.log('🎤 ElevenLabs template mode initialized (credits preserved)');
-            console.warn('⚠️ Per-lead agent creation DISABLED to prevent credit consumption');
-            
-            // Initialize with template only - NO actual agent creation to preserve credits
-            this.elevenlabsAgent = { 
-                id: 'template-agent', 
-                template_ready: true,
-                credits_preserved: true,
-                per_lead_creation_disabled: true
-            };
-            
-        } catch (error) {
-            console.error(`❌ ElevenLabs agent initialization failed: ${error.message}`);
-            this.elevenlabsAgent = null;
-        }
-    }
-
-    async createElevenLabsAgent(practiceData = null) {
-        try {
-            // Generate dynamic system prompt based on practice data
-            const systemPrompt = this.generateDynamicSystemPrompt(practiceData);
-            const firstMessage = this.generateDynamicFirstMessage(practiceData);
-            const agentName = practiceData ? practiceData.company : 'Healthcare Assistant';
-
-            const response = await axios.post(
-                'https://api.elevenlabs.io/v1/convai/agents/create',
-                {
-                    name: agentName,
-                    conversation_config: {
-                        agent: {
-                            first_message: firstMessage,
-                            language: "en",
-                            prompt: {
-                                prompt: systemPrompt
-                            }
-                        }
-                    },
-                    tags: ["healthcare", "appointment-scheduling", "automated"]
-                },
-                {
-                    headers: {
-                        'xi-api-key': config.elevenlabs_api_key,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            console.log(`✅ ElevenLabs agent created successfully: ${agentName}`);
-            return {
-                id: response.data.agent_id,
-                name: agentName,
-                config: response.data
-            };
-        } catch (error) {
-            console.error(`❌ Failed to create ElevenLabs agent: ${error.message}`);
-            if (error.response) {
-                console.error(`API Response: ${JSON.stringify(error.response.data)}`);
-            }
-            throw error;
-        }
-    }
-
-    generateDynamicSystemPrompt(practiceData) {
-        // If no practice data provided, use generic template
-        if (!practiceData) {
-            return `## 🏥 **[CLINIC_NAME] Appointment Scheduler Prompt**
-
-**You are the professional, friendly appointment scheduling assistant at [CLINIC_NAME] at [CLINIC_ADDRESS]. Your role is to efficiently and warmly help clients schedule their healthcare treatments while providing clear, detailed, and reassuring information about our services.**
-
-**🎯 IMPORTANT: This is a TEMPLATE with DYNAMIC VARIABLES that get filled per lead:**
-- [CLINIC_NAME] = The actual clinic name from lead data
-- [CLINIC_ADDRESS] = The actual clinic address from lead data  
-- [TREATMENTS] = The actual treatments offered by this clinic
-- [SERVICES] = The actual services provided by this clinic
-
-**Each lead will have these variables automatically filled with their specific clinic information.**
-
-### 🎯 **GENERAL INSTRUCTIONS**
-- Ask only ONE clear question at a time
-- Use friendly, natural, conversational language  
-- Acknowledge customer responses before moving to the next question
-- Never ask multiple questions in one message
-- If the customer seems unsure, briefly explain the treatments to help them choose
-- Always collect and confirm the customer's full name, phone number, and email address
-
-### 📍 **LOCATION POLICY**
-[CLINIC_NAME] has only ONE location: **[CLINIC_ADDRESS]**
-Confirm appointments at "[CLINIC_NAME] at [CLINIC_ADDRESS]" without asking about location preference.
-
-### 🏥 **AVAILABLE TREATMENTS & SERVICES**
-**[CLINIC_NAME] offers comprehensive services:**
-[TREATMENTS] - These will be dynamically filled based on the actual clinic's services
-
-### 🗓️ **APPOINTMENT SCHEDULING FLOW**
-1. Confirm treatment choice and specific details
-2. Ask about prior experience (if relevant)  
-3. Confirm preferred date and time
-4. Collect customer details one at a time: Full name, Phone number, Email address
-5. Repeat details for confirmation
-6. Final appointment confirmation
-7. Professional closing
-
-### 💙 **TONE GUIDELINES**
-- Warm, professional, and caring
-- Sound knowledgeable about the clinic's treatments  
-- Emphasize the clinic's expertise and environment
-- Focus on patient care and wellness goals`;
-        }
-
-        // Generate personalized prompt with actual practice data
-        const clinicName = practiceData.company || 'Healthcare Practice';
-        const clinicAddress = practiceData.location || 'Healthcare Location';
-        const treatments = Array.isArray(practiceData.services) ? 
-            practiceData.services.join(', ') : 
-            'General healthcare services, Consultations, Treatment planning';
-
-        return `## 🏥 **${clinicName} Appointment Scheduler Prompt**
-
-**You are the professional, friendly appointment scheduling assistant at ${clinicName} at ${clinicAddress}. Your role is to efficiently and warmly help clients schedule their healthcare treatments while providing clear, detailed, and reassuring information about our services.**
-
-### 🎯 **GENERAL INSTRUCTIONS**
-- Ask only ONE clear question at a time
-- Use friendly, natural, conversational language  
-- Acknowledge customer responses before moving to the next question
-- Never ask multiple questions in one message
-- If the customer seems unsure, briefly explain the treatments to help them choose
-- Always collect and confirm the customer's full name, phone number, and email address
-
-### 📍 **LOCATION POLICY**
-${clinicName} has only ONE location: **${clinicAddress}**
-Confirm appointments at "${clinicName} at ${clinicAddress}" without asking about location preference.
-
-### 🏥 **AVAILABLE TREATMENTS & SERVICES**
-**${clinicName} offers comprehensive services including:**
-${treatments}
-
-### 🗓️ **APPOINTMENT SCHEDULING FLOW**
-1. Confirm treatment choice and specific details
-2. Ask about prior experience (if relevant)  
-3. Confirm preferred date and time
-4. Collect customer details one at a time: Full name, Phone number, Email address
-5. Repeat details for confirmation
-6. Final appointment confirmation
-7. Professional closing
-
-### 🌟 **EXAMPLE RESPONSES**
-- "Thank you for calling ${clinicName}! Which treatment interests you today?"
-- "Excellent choice! When would you like to schedule your appointment?"
-- "May I have your full name to book your appointment?"
-- "Your appointment is scheduled at ${clinicName} at ${clinicAddress}."
-
-### 💙 **TONE GUIDELINES**
-- Warm, professional, and caring
-- Sound knowledgeable about ${clinicName}'s treatments  
-- Emphasize ${clinicName}'s expertise and professional environment
-- Focus on patient care and wellness goals`;
-    }
-
-    generateDynamicFirstMessage(practiceData) {
-        // If no practice data provided, use generic template
-        if (!practiceData) {
-            return "Thank you for calling [CLINIC_NAME]! This is your wellness assistant. We're here to help you begin your healthcare journey. Which of our treatments can I help you schedule today? (NOTE: [CLINIC_NAME] will be filled with actual clinic name per lead)";
-        }
-
-        // Generate personalized first message with actual practice data
-        const clinicName = practiceData.company || 'Healthcare Practice';
-        
-        return `Thank you for calling ${clinicName}! This is your wellness assistant. We're here to help you begin your healthcare journey. Which of our treatments can I help you schedule today?`;
-    }
+    // ===== REMOVED: ElevenLabs voice agent functionality not needed for 3-step workflow =====
 
     // ===== STEP 1: ENHANCED EXA SEARCH & DATA EXTRACTION =====
     async scrapeHealthcarePractice(url) {
@@ -827,488 +650,101 @@ ${treatments}
         };
     }
 
-    // ===== GITHUB REPOSITORY CREATION UTILITY =====
-    async createGitHubRepository(practiceData, repoName) {
-        console.log(`🐙 Creating GitHub repository: ${repoName}`);
-        
-        try {
-            // 1. Create new repository via GitHub API
-            const createCmd = [
-                'curl', '-X', 'POST',
-                '-H', `Authorization: token ${config.github_token}`,
-                '-H', 'Accept: application/vnd.github.v3+json',
-                'https://api.github.com/user/repos',
-                '-d', JSON.stringify({
-                    'name': repoName,
-                    'description': `AI healthcare demo for ${practiceData.company}`,
-                    'private': false,
-                    'auto_init': true
-                })
-            ];
-            
-            const createResult = execSync(createCmd.join(' '), { 
-                encoding: 'utf8',
-                shell: true 
-            });
-            
-            const repoData = JSON.parse(createResult);
-            
-            if (!repoData.clone_url) {
-                return { success: false, error: `GitHub API response invalid: ${createResult}` };
-            }
-            
-            // 2. Clone and set up repository with templates (simplified for now)
-            const repoPath = `/tmp/${repoName}`;
-            
-            execSync(`git clone ${repoData.clone_url} ${repoPath}`, { encoding: 'utf8' });
-            
-            // Create basic Next.js structure with practice data
-            this.generateHealthcareTemplate(repoPath, practiceData);
-            
-            // 3. Commit and push
-            execSync(`cd ${repoPath} && git add .`, { encoding: 'utf8' });
-            execSync(`cd ${repoPath} && git commit -m "🏥 Healthcare demo for ${practiceData.company}"`, { encoding: 'utf8' });
-            
-            const authUrl = `https://${config.github_token}@github.com/jomarcello/${repoName}.git`;
-            execSync(`cd ${repoPath} && git remote set-url origin ${authUrl}`, { encoding: 'utf8' });
-            execSync(`cd ${repoPath} && git push origin main`, { encoding: 'utf8' });
-            
-            return {
-                success: true,
-                repo_name: repoName,
-                repo_url: repoData.html_url,
-                clone_url: repoData.clone_url
-            };
-            
-        } catch (error) {
-            return { success: false, error: `GitHub repository creation failed: ${error.message}` };
-        }
-    }
+    // ===== REMOVED: GitHub repository creation no longer needed for 3-step workflow =====
 
-    generateHealthcareTemplate(repoPath, practiceData) {
-        // Create basic package.json for Next.js
-        const packageJson = {
-            "name": `${practiceData.practiceId}-demo`,
-            "version": "0.1.0",
-            "private": true,
-            "scripts": {
-                "dev": "next dev",
-                "build": "next build", 
-                "start": "next start"
-            },
-            "dependencies": {
-                "react": "^18.0.0",
-                "react-dom": "^18.0.0",
-                "next": "^15.0.0"
-            }
-        };
-        
-        execSync(`echo '${JSON.stringify(packageJson, null, 2)}' > ${repoPath}/package.json`);
-        
-        // Create simple README
-        const readme = `# ${practiceData.company} - Healthcare Demo\n\nAI-powered healthcare website for ${practiceData.company}.\n\n## Features\n- Professional healthcare website\n- AI chat assistant\n- Responsive design\n\nGenerated by Healthcare Automation Agent.`;
-        
-        execSync(`echo '${readme}' > ${repoPath}/README.md`);
-    }
+    // ===== REMOVED: Repository creation and Railway deployment no longer needed for 3-step workflow =====
 
-    // ===== STEP 3: GITHUB REPOSITORY CREATION =====
-    async createPersonalizedRepository(practiceData) {
-        console.log(`📦 STEP 3: Creating fault-tolerant personalized repository`);
-        this.currentStep = 'github-repo';
-        
-        const deploymentStrategies = [
-            { name: 'full-github-railway', priority: 1 },
-            { name: 'existing-repo-railway', priority: 2 },
-            { name: 'direct-railway-mcp', priority: 3 },
-            { name: 'emergency-mock', priority: 4 }
-        ];
-        
-        for (const strategy of deploymentStrategies) {
-            console.log(`   🎯 Attempting strategy ${strategy.priority}/4: ${strategy.name}`);
-            
-            try {
-                switch (strategy.name) {
-                    case 'full-github-railway':
-                        return await this.attemptFullGithubRailwayDeployment(practiceData);
-                    
-                    case 'existing-repo-railway':
-                        return await this.attemptExistingRepoDeployment(practiceData);
-                    
-                    case 'direct-railway-mcp':
-                        return await this.attemptDirectRailwayMCP(practiceData);
-                    
-                    case 'emergency-mock':
-                        return this.createEmergencyMockDeployment(practiceData);
-                }
-            } catch (error) {
-                console.error(`   ❌ Strategy ${strategy.name} failed: ${error.message}`);
-                if (strategy.priority === 4) {
-                    console.error(`   💀 All deployment strategies exhausted`);
-                    return {
-                        success: false,
-                        error: `All deployment strategies failed. Last error: ${error.message}`,
-                        method: 'all-failed'
-                    };
-                }
-                console.log(`   🔄 Falling back to next strategy...`);
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Brief delay
-                continue;
-            }
-        }
-    }
-    
-    async attemptFullGithubRailwayDeployment(practiceData) {
-        const repoName = `${practiceData.practiceId}-demo`;
-        console.log(`   🔨 Creating full GitHub + Railway deployment: ${repoName}`);
-        
-        // Step 1: Create GitHub repository
-        const githubResult = await this.createGitHubRepository(practiceData, repoName);
-        if (!githubResult.success) {
-            throw new Error(`GitHub creation failed: ${githubResult.error}`);
-        }
-        
-        console.log(`   ✅ GitHub repository created: ${githubResult.repo_url}`);
-        
-        // Step 2: Deploy to Railway using MCP
-        try {
-            const railwayResult = await this.deployToRailwayViaMCP(practiceData, githubResult.repo_name);
-            
-            return {
-                success: true,
-                github_repo: githubResult.repo_url,
-                railway_url: railwayResult.domain_url,
-                project_id: railwayResult.project_id,
-                service_id: railwayResult.service_id,
-                method: 'full-github-railway'
-            };
-        } catch (railwayError) {
-            // GitHub succeeded, Railway failed - still partial success
-            console.log(`   ⚠️ Railway deployment failed but GitHub succeeded`);
-            throw new Error(`Railway deployment failed: ${railwayError.message}`);
-        }
-    }
-    
-    async attemptExistingRepoDeployment(practiceData) {
-        console.log(`   🔄 Using existing repository for Railway deployment`);
-        
-        const railwayResult = await this.deployToRailwayViaMCP(practiceData, 'Agentsdemo');
-        
-        return {
-            success: true,
-            github_repo: 'https://github.com/jomarcello/Agentsdemo',
-            railway_url: railwayResult.domain_url,
-            project_id: railwayResult.project_id,
-            service_id: railwayResult.service_id,
-            method: 'existing-repo-railway'
-        };
-    }
-    
-    async attemptDirectRailwayMCP(practiceData) {
-        console.log(`   🚂 Direct Railway MCP deployment`);
-        
-        // Use Railway MCP client directly without GitHub dependency
-        const railwayResult = await this.createDirectRailwayService(practiceData);
-        
-        return {
-            success: true,
-            github_repo: null,
-            railway_url: railwayResult.domain_url,
-            project_id: railwayResult.project_id,
-            service_id: railwayResult.service_id,
-            method: 'direct-railway-mcp'
-        };
-    }
-    
-    createEmergencyMockDeployment(practiceData) {
-        console.log(`   🆘 Creating emergency mock deployment`);
-        
-        const mockUrl = `https://${practiceData.practiceId}-emergency-${Date.now()}.mock.demo`;
-        
-        return {
-            success: true,
-            github_repo: 'https://github.com/jomarcello/Agentsdemo',
-            railway_url: mockUrl,
-            project_id: 'emergency-mock',
-            service_id: 'emergency-service',
-            method: 'emergency-mock',
-            note: 'Emergency mock deployment - workflow completed with simulated resources'
-        };
-    }
-    
-    async deployToRailwayViaMCP(practiceData, repoName) {
-        try {
-            // Attempt Railway deployment using MCP
-            const createResult = await this.railwayMCP.createProject({
-                name: `${practiceData.practiceId}-healthcare`
-            });
-            
-            if (!createResult.success) {
-                throw new Error('Failed to create Railway project');
-            }
-            
-            const serviceResult = await this.railwayMCP.createServiceFromRepo({
-                projectId: createResult.project_id,
-                repo: `jomarcello/${repoName}`
-            });
-            
-            if (!serviceResult.success) {
-                throw new Error('Failed to create Railway service');
-            }
-            
-            // Set environment variables
-            await this.railwayMCP.setEnvironmentVariables({
-                projectId: createResult.project_id,
-                serviceId: serviceResult.service_id,
-                variables: {
-                    NEXT_PUBLIC_PRACTICE_ID: practiceData.practiceId,
-                    NEXT_PUBLIC_COMPANY: practiceData.company,
-                    NEXT_PUBLIC_DOMAIN: practiceData.domain
-                }
-            });
-            
-            // Create domain
-            const domainResult = await this.railwayMCP.createDomain({
-                serviceId: serviceResult.service_id,
-                environmentId: serviceResult.environment_id
-            });
-            
-            return {
-                project_id: createResult.project_id,
-                service_id: serviceResult.service_id,
-                domain_url: domainResult.domain_url || `https://${practiceData.practiceId}-service-production.up.railway.app`
-            };
-            
-        } catch (error) {
-            throw new Error(`Railway MCP deployment failed: ${error.message}`);
-        }
-    }
-    
-    async createDirectRailwayService(practiceData) {
-        // Direct Railway service creation without GitHub dependency
-        const projectName = `${practiceData.practiceId}-direct-${Date.now()}`;
-        
-        // Create project and service using Railway MCP
-        const projectResult = await this.railwayMCP.createProject({ name: projectName });
-        const serviceResult = await this.railwayMCP.createServiceFromImage({
-            projectId: projectResult.project_id,
-            image: 'nginx:alpine'
-        });
-        
-        return {
-            project_id: projectResult.project_id,
-            service_id: serviceResult.service_id,
-            domain_url: `https://${practiceData.practiceId}-direct-production.up.railway.app`
-        };
-    }
-
-    // ===== STEP 4: FAULT-TOLERANT COMPLETE AUTOMATION WORKFLOW =====
+    // ===== SIMPLIFIED 3-STEP WORKFLOW: EXA SEARCH + NOTION STORAGE + TELEGRAM RESPONSE =====
     async processHealthcarePractice(url) {
-        console.log(`\n🤖 STARTING FAULT-TOLERANT HEALTHCARE AUTOMATION`);
+        console.log(`\n🏥 STARTING 3-STEP HEALTHCARE LEAD DISCOVERY`);
         console.log(`🎯 Target URL: ${url}`);
         console.log(`⏰ Started at: ${new Date().toLocaleString()}`);
-        console.log(`🛡️ Fault-tolerant mode: Workflow continues past individual step failures`);
+        console.log(`🔍 Simple workflow: EXA search → Notion storage → Results`);
         
         const startTime = Date.now();
-        const stepResults = {
-            scraping: { success: false, error: null, data: null },
-            notion: { success: false, error: null, data: null },
-            deployment: { success: false, error: null, data: null }
-        };
-        
         let practiceData = null;
         let notionResult = null;
-        let deploymentResult = null;
         
-        // ===== PHASE 0: SCRAPING (FAULT-TOLERANT) =====
         try {
-            console.log(`\n🔍 PHASE 0: Lead Discovery & Scraping`);
+            // ===== STEP 1: EXA SEARCH & DATA EXTRACTION =====
+            console.log(`\n🔍 STEP 1: EXA Search & Data Extraction`);
             practiceData = await this.scrapeHealthcarePractice(url);
             
             if (!practiceData || !practiceData.company) {
                 throw new Error('No valid practice data extracted');
             }
             
-            stepResults.scraping = { success: true, data: practiceData };
-            console.log(`   ✅ Scraping successful: ${practiceData.company}`);
+            console.log(`   ✅ Data extracted: ${practiceData.company}`);
+            console.log(`   🏥 Services: ${Array.isArray(practiceData.services) ? practiceData.services.slice(0,3).join(', ') : 'Healthcare Services'}`);
+            console.log(`   💊 Treatments: ${Array.isArray(practiceData.treatments) ? practiceData.treatments.slice(0,3).join(', ') : 'Consultation'}`);
             
-        } catch (scrapingError) {
-            console.error(`   ❌ Scraping failed: ${scrapingError.message}`);
-            console.log(`   🔄 Creating minimal fallback practice data`);
-            
-            // Create absolute minimal fallback data to continue workflow
-            practiceData = this.createMinimalFallbackData(url);
-            stepResults.scraping = { 
-                success: false, 
-                error: scrapingError.message, 
-                data: practiceData,
-                fallback_used: true
-            };
-            
-            console.log(`   ⚡ Fallback data created: ${practiceData.company}`);
-        }
-
-        // ===== PHASE 1: NOTION STORAGE (FAULT-TOLERANT) =====
-        try {
-            console.log(`\n📊 PHASE 1: Notion Database Storage`);
+            // ===== STEP 2: NOTION DATABASE STORAGE =====
+            console.log(`\n📊 STEP 2: Notion Database Storage`);
             notionResult = await this.storeLeadInNotion(practiceData);
             
-            stepResults.notion = { success: true, data: notionResult };
-            console.log(`   ✅ Notion storage: ${notionResult.is_fallback ? 'Fallback' : 'Success'}`);
+            console.log(`   ✅ Stored in Notion: ${notionResult.leadId}`);
+            console.log(`   📋 Record type: ${notionResult.is_fallback ? 'Fallback' : 'Standard'}`);
             
-        } catch (notionError) {
-            console.error(`   ❌ Notion storage completely failed: ${notionError.message}`);
-            console.log(`   🔄 Creating emergency fallback record`);
+            // ===== STEP 3: RESULTS & COMPLETION =====
+            const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`\n✅ STEP 3: Workflow Complete!`);
+            console.log(`   🏥 Practice: ${practiceData.company}`);
+            console.log(`   📍 Location: ${practiceData.location}`);
+            console.log(`   📊 Lead Score: ${practiceData.lead_score || 50}/100`);
+            console.log(`   ⏱️  Total time: ${totalTime}s`);
             
-            notionResult = {
+            const result = {
                 success: true,
-                leadId: `emergency_${Date.now()}`,
-                record: { company: practiceData.company, status: 'Emergency Fallback' },
-                is_emergency_fallback: true
+                workflow_type: '3-step-simplified',
+                practice: {
+                    company: practiceData.company,
+                    location: practiceData.location,
+                    practice_id: practiceData.practiceId,
+                    services: practiceData.services,
+                    treatments: practiceData.treatments,
+                    lead_score: practiceData.lead_score
+                },
+                notion: {
+                    stored: notionResult.success,
+                    lead_id: notionResult.leadId,
+                    is_fallback: notionResult.is_fallback
+                },
+                timing: {
+                    total_seconds: parseFloat(totalTime),
+                    started_at: new Date(startTime).toISOString(),
+                    completed_at: new Date().toISOString()
+                }
             };
-            
-            stepResults.notion = { 
-                success: false, 
-                error: notionError.message, 
-                data: notionResult,
-                emergency_fallback: true
-            };
-            
-            console.log(`   ⚡ Emergency record created - workflow continues`);
-        }
 
-        // ===== PHASE 2+3: REPOSITORY & DEPLOYMENT (FAULT-TOLERANT) =====
-        try {
-            console.log(`\n🏗️ PHASE 2-3: Repository Creation & Railway Deployment`);
-            deploymentResult = await this.createPersonalizedRepository(practiceData);
+            // Store result for dashboard
+            this.deploymentResults.push(result);
+            this.currentStep = 'complete';
+
+            return result;
             
-            stepResults.deployment = { success: deploymentResult.success, data: deploymentResult };
+        } catch (error) {
+            console.error(`❌ Workflow failed: ${error.message}`);
             
-            if (deploymentResult.success) {
-                console.log(`   ✅ Complete deployment successful!`);
-            } else {
-                console.log(`   ⚠️ Deployment partially failed but workflow completed`);
-            }
-            
-        } catch (deploymentError) {
-            console.error(`   ❌ Deployment failed: ${deploymentError.message}`);
-            console.log(`   🔄 Creating fallback deployment record`);
-            
-            deploymentResult = {
+            const result = {
                 success: false,
-                error: deploymentError.message,
-                github_repo: 'N/A - Deployment Failed',
-                railway_url: 'N/A - Deployment Failed',
-                method: 'failed-with-fallback',
-                fallback_reason: deploymentError.message
+                workflow_type: '3-step-simplified',
+                error: error.message,
+                practice: practiceData ? {
+                    company: practiceData.company || 'Unknown',
+                    practice_id: practiceData.practiceId || 'unknown'
+                } : null,
+                timing: {
+                    total_seconds: ((Date.now() - startTime) / 1000).toFixed(1),
+                    started_at: new Date(startTime).toISOString(),
+                    completed_at: new Date().toISOString()
+                }
             };
+
+            this.deploymentResults.push(result);
+            this.currentStep = 'failed';
             
-            stepResults.deployment = { 
-                success: false, 
-                error: deploymentError.message, 
-                data: deploymentResult,
-                fallback_used: true
-            };
-            
-            console.log(`   ⚡ Fallback deployment record created`);
+            return result;
         }
-
-        // ===== PHASE 4: WORKFLOW COMPLETION & ANALYSIS =====
-        const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-        const successfulSteps = Object.values(stepResults).filter(step => step.success).length;
-        const totalSteps = Object.keys(stepResults).length;
-        
-        // Determine overall workflow status
-        let workflowStatus = 'failed';
-        if (successfulSteps === totalSteps) {
-            workflowStatus = 'complete';
-        } else if (successfulSteps > 0) {
-            workflowStatus = 'partial-success';
-        }
-        
-        const result = {
-            success: workflowStatus !== 'failed',
-            workflow_status: workflowStatus,
-            practice: {
-                company: practiceData.company,
-                doctor: practiceData.doctor,
-                location: practiceData.location,
-                practice_id: practiceData.practiceId
-            },
-            deployment: {
-                github_repo: deploymentResult.github_repo,
-                railway_url: deploymentResult.railway_url,
-                method: deploymentResult.method,
-                project_id: deploymentResult.project_id,
-                service_id: deploymentResult.service_id
-            },
-            notion: {
-                stored: notionResult.success,
-                lead_id: notionResult.leadId,
-                is_fallback: notionResult.is_fallback || notionResult.is_emergency_fallback
-            },
-            step_analysis: {
-                scraping: stepResults.scraping,
-                notion: stepResults.notion,
-                deployment: stepResults.deployment,
-                successful_steps: successfulSteps,
-                total_steps: totalSteps,
-                success_rate: `${Math.round((successfulSteps / totalSteps) * 100)}%`
-            },
-            timing: {
-                total_seconds: parseFloat(totalTime),
-                started_at: new Date(startTime).toISOString(),
-                completed_at: new Date().toISOString()
-            },
-            fault_tolerance: {
-                enabled: true,
-                fallbacks_used: [
-                    stepResults.scraping.fallback_used && 'scraping',
-                    stepResults.notion.emergency_fallback && 'notion-emergency',
-                    stepResults.deployment.fallback_used && 'deployment'
-                ].filter(Boolean)
-            }
-        };
-
-        // ElevenLabs agent creation DISABLED to preserve credits
-        if (this.elevenlabsAgent && this.elevenlabsAgent.per_lead_creation_disabled) {
-            console.log(`\n🎤 PHASE 4: ElevenLabs Agent (Template Mode - Credits Preserved)`);
-            console.warn(`⚠️ Per-lead agent creation disabled to prevent credit drainage`);
-            
-            result.elevenlabs_agent = {
-                created: false,
-                template_available: true,
-                reason: 'Per-lead creation disabled to preserve ElevenLabs credits',
-                credits_preserved: true,
-                company: practiceData.company,
-                template_ready: true,
-                note: 'Enable per-lead creation only when needed for production'
-            };
-            
-            console.log(`✅ ElevenLabs template ready for: ${practiceData.company} (credits preserved)`);
-        }
-
-        // Store result for dashboard
-        this.deploymentResults.push(result);
-        this.currentStep = workflowStatus === 'complete' ? 'complete' : 'partial';
-
-        console.log(`\n🎯 FAULT-TOLERANT WORKFLOW ${workflowStatus.toUpperCase()}!`);
-        console.log(`✅ Company: ${practiceData.company}`);
-        console.log(`✅ Success Rate: ${result.step_analysis.success_rate} (${successfulSteps}/${totalSteps} steps)`);
-        console.log(`✅ Demo URL: ${deploymentResult.railway_url}`);
-        console.log(`⏱️  Total time: ${totalTime}s`);
-        console.log(`🛡️ Fault Tolerance: ${result.fault_tolerance.fallbacks_used.length > 0 ? 
-            `Used fallbacks: ${result.fault_tolerance.fallbacks_used.join(', ')}` : 
-            'No fallbacks needed - clean execution'}`);
-        console.log(`🎯 Method: ${deploymentResult.method}`);
-        if (result.elevenlabs_agent) {
-            if (result.elevenlabs_agent.created) {
-                console.log(`🎤 ElevenLabs Agent: ${result.elevenlabs_agent.agent_name} (${result.elevenlabs_agent.agent_id})`);
-            } else if (result.elevenlabs_agent.credits_preserved) {
-                console.log(`🎤 ElevenLabs: Template mode (credits preserved for ${result.elevenlabs_agent.company})`);
-            }
-        }
-
-        return result;
     }
 
     createMinimalFallbackData(url) {
@@ -1434,7 +870,7 @@ ${treatments}
 
     // ===== API ENDPOINTS =====
     setupRoutes() {
-        // Main automation endpoint - fault-tolerant batch processing
+        // Main automation endpoint - SIMPLIFIED 3-step processing
         app.post('/automate', async (req, res) => {
             const { url, urls } = req.body;
             
@@ -1444,27 +880,37 @@ ${treatments}
 
             try {
                 if (urls && Array.isArray(urls)) {
-                    // Batch processing with fault tolerance
-                    const results = await this.processBatchHealthcarePractices(urls);
+                    // Batch processing - simplified
+                    const results = [];
+                    for (const singleUrl of urls) {
+                        try {
+                            const result = await this.processHealthcarePractice(singleUrl);
+                            results.push({ url: singleUrl, success: true, result });
+                        } catch (error) {
+                            results.push({ url: singleUrl, success: false, error: error.message });
+                        }
+                    }
+                    
                     res.json({
                         success: true,
+                        workflow_type: '3-step-simplified',
                         batch_results: results,
                         total_processed: results.length,
                         successful: results.filter(r => r.success).length,
                         failed: results.filter(r => !r.success).length
                     });
                 } else {
-                    // Single URL processing
+                    // Single URL processing - 3 steps only
                     const result = await this.processHealthcarePractice(url);
                     res.json(result);
                 }
             } catch (error) {
-                console.error('Critical automation endpoint error:', error);
+                console.error('Healthcare lead discovery error:', error);
                 res.status(500).json({ 
                     success: false,
+                    workflow_type: '3-step-simplified',
                     error: error.message,
-                    current_step: this.currentStep,
-                    recovery_suggestion: 'Try individual URL processing or check system health'
+                    current_step: this.currentStep
                 });
             }
         });
@@ -1701,7 +1147,7 @@ ${treatments}
             });
         });
 
-        // Telegram webhook endpoint
+        // Telegram webhook endpoint - SIMPLIFIED TO 3 STEPS ONLY
         app.post('/telegram-webhook', async (req, res) => {
             try {
                 const message = req.body?.message;
@@ -1720,47 +1166,46 @@ ${treatments}
                 if (urlMatch) {
                     const url = urlMatch[0];
                     
-                    // Send processing started message
-                    await this.sendTelegramMessage(chatId, `🤖 Processing healthcare practice: ${url}\n\nStarting complete automation workflow...`);
+                    // Send processing started message - SIMPLIFIED VERSION
+                    await this.sendTelegramMessage(chatId, `🏥 Healthcare Lead Discovery Agent\n\nProcessing: ${url}\n\n🔍 Starting 3-step workflow...`);
                     
-                    // Process in background
+                    // Process in background - ONLY 3 STEPS
                     setImmediate(async () => {
                         try {
-                            const result = await this.runCompleteWorkflow(url);
+                            // STEP 1: EXA Search & Data Extraction
+                            await this.sendTelegramMessage(chatId, `📍 Step 1/3: EXA search & data extraction...`);
+                            const practiceData = await this.scrapeHealthcarePractice(url);
                             
-                            if (result.success) {
-                                await this.sendTelegramMessage(chatId, 
-                                    `✅ Complete! Healthcare automation finished:\n\n` +
-                                    `🏥 Practice: ${result.practiceData?.company || 'N/A'}\n` +
-                                    `👨‍⚕️ Doctor: ${result.practiceData?.doctor || 'N/A'}\n` +
-                                    `🌐 Demo URL: ${result.demo_url || 'Processing...'}\n\n` +
-                                    `📊 Full workflow completed successfully!`
-                                );
-                            } else {
-                                await this.sendTelegramMessage(chatId, 
-                                    `❌ Processing failed:\n${result.error || 'Unknown error'}\n\n` +
-                                    `Please check the URL and try again.`
-                                );
-                            }
+                            // STEP 2: Notion Storage
+                            await this.sendTelegramMessage(chatId, `📊 Step 2/3: Storing lead in Notion database...`);
+                            const notionResult = await this.storeLeadInNotion(practiceData);
+                            
+                            // STEP 3: Response with Results
+                            await this.sendTelegramMessage(chatId, `✅ Step 3/3: Complete!\n\n` +
+                                `🏥 Practice: ${practiceData.company}\n` +
+                                `📍 Location: ${practiceData.location}\n` +
+                                `💊 Treatments: ${Array.isArray(practiceData.treatments) ? practiceData.treatments.slice(0,3).join(', ') : 'Consultation'}\n` +
+                                `🔧 Services: ${Array.isArray(practiceData.services) ? practiceData.services.slice(0,3).join(', ') : 'Healthcare Services'}\n` +
+                                `📊 Lead Score: ${practiceData.lead_score || 50}/100\n` +
+                                `💾 Notion ID: ${notionResult.leadId}\n\n` +
+                                `✅ Lead stored successfully!`);
+                            
                         } catch (error) {
-                            await this.sendTelegramMessage(chatId, `❌ Automation error: ${error.message}`);
+                            await this.sendTelegramMessage(chatId, `❌ Processing failed: ${error.message}`);
                         }
                     });
                     
                 } else {
-                    // No URL found, send help message
+                    // No URL found, send help message - SIMPLIFIED VERSION
                     await this.sendTelegramMessage(chatId, 
-                        `🏥 Healthcare Automation Agent\n\n` +
-                        `Send me a healthcare practice URL to start automation:\n` +
-                        `Example: https://drsmith.com\n\n` +
+                        `🏥 Healthcare Lead Discovery Agent\n\n` +
+                        `Send me a healthcare practice URL:\n` +
+                        `Example: https://healthclinic.com\n\n` +
                         `I will:\n` +
-                        `1. 🔍 Scrape practice information\n` +
+                        `1. 🔍 Search with EXA AI\n` +
                         `2. 📊 Store in Notion database\n` +
-                        `3. 📦 Create GitHub repository\n` +
-                        `4. 🚀 Deploy to Railway\n` +
-                        `5. 🌐 Provide demo URL\n\n` +
-                        `Current status: ${this.currentStep}`
-                    );
+                        `3. 📱 Send you the results\n\n` +
+                        `Simple 3-step workflow!`);
                 }
 
                 res.json({ status: 'ok' });
@@ -1782,24 +1227,34 @@ ${treatments}
             });
         });
 
-        // Simple test endpoint
+        // Simple test endpoint - UPDATED for 3-step workflow
         app.get('/', (req, res) => {
             res.json({
-                agent: '🏥 Complete Healthcare Automation Agent',
+                agent: '🏥 Healthcare Lead Discovery Agent',
                 status: 'ready',
+                workflow_type: '3-step-simplified',
                 instructions: {
-                    'POST /automate': 'Run complete automation workflow',
+                    'POST /automate': 'Run 3-step healthcare lead discovery',
                     'POST /telegram-webhook': 'Telegram bot webhook endpoint',
+                    'POST /discover-leads': 'Search for healthcare leads with EXA',
+                    'POST /process-leads': 'Process discovered leads to Notion',
                     'GET /status': 'Get current agent status',
-                    'GET /deployments': 'View all deployment results',
                     'GET /health': 'Health check'
                 },
                 workflow: [
-                    '1. Web scraping (Puppeteer/Playwright)',
-                    '2. Notion database storage', 
-                    '3. GitHub repository creation',
-                    '4. Railway deployment',
-                    '5. Demo URL generation'
+                    '1. 🔍 EXA AI search & data extraction',
+                    '2. 📊 Notion database storage with treatments/services', 
+                    '3. 📱 Telegram response with results'
+                ],
+                features: [
+                    '✅ EXA AI-powered healthcare data extraction',
+                    '✅ Enhanced Notion storage with treatments & services',
+                    '✅ Lead scoring (0-100)',
+                    '✅ Telegram bot integration',
+                    '✅ Batch processing support',
+                    '❌ No GitHub repos (removed for simplicity)',
+                    '❌ No Railway deployment (removed for simplicity)',
+                    '❌ No ElevenLabs agents (removed for simplicity)'
                 ]
             });
         });
@@ -1810,18 +1265,19 @@ ${treatments}
         this.setupRoutes();
         
         app.listen(config.port, () => {
-            console.log(`\n🤖 COMPLETE HEALTHCARE AUTOMATION AGENT`);
+            console.log(`\n🏥 HEALTHCARE LEAD DISCOVERY AGENT`);
             console.log(`🌐 Server running on port ${config.port}`);
-            console.log(`📋 Workflow: Scrape → Notion → GitHub → Railway → Demo URL`);
+            console.log(`📋 Workflow: EXA Search → Notion Storage → Telegram Response`);
             console.log(`🔧 Configuration:`);
-            console.log(`   GitHub Token: ${config.github_token ? '✅ Available' : '❌ Missing'}`);
-            console.log(`   Railway Token: ${config.railway_token ? '✅ Available' : '❌ Missing'}`);
+            console.log(`   EXA API: ${config.exa_api_key ? '✅ Available' : '❌ Missing'}`);
             console.log(`   Notion DB: ${config.notion_database_id}`);
             console.log(`   Telegram Bot: ${config.telegram_bot_token ? '✅ Available' : '❌ Missing'}`);
             console.log(`\n📖 Usage:`);
             console.log(`   POST /automate { "url": "https://healthcare-practice.com" }`);
-            console.log(`   GET  /status (view current status and results)`);
-            console.log(`\n🎯 Ready for complete healthcare automation!`);
+            console.log(`   POST /discover-leads { "query": "cosmetic surgery london" }`);
+            console.log(`   GET  /status (view current status)`);
+            console.log(`\n🎯 Ready for 3-step healthcare lead discovery!`);
+            console.log(`✅ SIMPLIFIED: No GitHub repos, No Railway deployment, No ElevenLabs`);
         });
         
     }
